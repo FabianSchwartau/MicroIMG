@@ -20,6 +20,7 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.io.ByteArrayInputStream;
@@ -45,11 +46,17 @@ public final class MainActivity extends Activity
     @Override public void onCreate(Bundle savedInstanceState)
     {
         super.onCreate(savedInstanceState);
+        if(android.os.Build.VERSION.SDK_INT >= 30)
+            getWindow().setDecorFitsSystemWindows(false);
         nfc = new NfcController(this, this::event);
         webView = new WebView(this);
         webView.setBackgroundColor(Color.rgb(11, 15, 26));
-        setContentView(webView);
-        webView.setOnApplyWindowInsetsListener((view, insets) -> {
+        FrameLayout content = new FrameLayout(this);
+        content.setBackgroundColor(Color.rgb(11, 15, 26));
+        content.addView(webView, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        setContentView(content);
+        // Inset the parent so fixed HTML elements use the actual safe viewport, including the keyboard.
+        content.setOnApplyWindowInsetsListener((view, insets) -> {
             if(android.os.Build.VERSION.SDK_INT >= 30)
             {
                 android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout() | WindowInsets.Type.ime());
@@ -59,6 +66,7 @@ public final class MainActivity extends Activity
                 view.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(), insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
             return android.os.Build.VERSION.SDK_INT >= 30 ? WindowInsets.CONSUMED : insets.consumeSystemWindowInsets();
         });
+        content.requestApplyInsets();
         // Only bundled assets can load; no network permission or remote navigation is allowed.
         webView.getSettings().setJavaScriptEnabled(true);
         webView.getSettings().setDomStorageEnabled(true);

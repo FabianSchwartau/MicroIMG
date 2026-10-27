@@ -277,6 +277,7 @@ function closeImport() {
 $('openImport').onclick = () => {
     $('importError').hidden = true;
     $('codeImport').hidden = false;
+    $('codeImport').firstElementChild.scrollTop = 0;
     $('codeText').focus();
 };
 $('dismissImport').onclick = closeImport;

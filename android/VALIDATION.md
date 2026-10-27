@@ -1,6 +1,19 @@
 # Android validation
 
-## Version 1.2.0
+## Version 1.2.1
+
+Validated on 2026-10-27 using an Android 11 / API 30 x86_64 emulator with on-screen navigation enabled and the software keyboard available.
+
+- Release, debug and instrumentation APK builds succeeded; `lintRelease` reported no errors.
+- All ten codec test groups and all 65 Android NDEF/UI checks passed.
+- New checks measure the actual native WebView bounds against Android system bar, cutout and keyboard insets. The WebView occupies exactly the safe area rather than drawing fixed HTML elements behind the navigation bar.
+- The fixed NFC status bar and its cancel button were verified above the navigation area.
+- The real Android software keyboard was opened and closed. The import dialog remained top aligned, stayed within the visible viewport, and the full viewport was restored after closing the keyboard.
+- The release remains signed with the existing local identity and increments the version code to 4.
+
+Reference: [Android system bar insets](https://developer.android.com/develop/ui/views/layout/edge-to-edge#system-bars-insets) and [software keyboard insets](https://developer.android.com/develop/ui/views/layout/sw-keyboard).
+
+## Previous validation: version 1.2.0
 
 Validated on 2026-10-27 using Android 11 / API 30 x86_64 in the emulator. Minimum API 26 and target API 36 remain unchanged.
 

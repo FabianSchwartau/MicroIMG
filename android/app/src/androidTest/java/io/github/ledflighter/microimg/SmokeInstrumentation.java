@@ -9,7 +9,11 @@ import android.nfc.NdefMessage;
 import android.nfc.NdefRecord;
 import android.os.Bundle;
 import android.view.ViewGroup;
+import android.view.View;
+import android.view.WindowInsets;
+import android.view.inputmethod.InputMethodManager;
 import android.webkit.WebView;
+import org.json.JSONArray;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
@@ -50,7 +54,7 @@ public final class SmokeInstrumentation extends Instrumentation
 
             Intent intent = new Intent(getTargetContext(), MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             Activity activity = startActivitySync(intent);
-            runOnMainSync(() -> webView = (WebView)((ViewGroup)activity.findViewById(android.R.id.content)).getChildAt(0));
+            runOnMainSync(() -> webView = findWebView(activity.findViewById(android.R.id.content)));
             long deadline = System.currentTimeMillis() + 30000;
             while(!"true".equals(js("!!window.MicroCodec && typeof window.onNativeEvent === 'function'")))
             {
@@ -58,6 +62,9 @@ public final class SmokeInstrumentation extends Instrumentation
                 Thread.sleep(200);
             }
             check("true".equals(js("document.getElementById('read').disabled")), "NFC is disabled on emulator without NFC");
+            int[] initialBounds = viewportBounds(activity);
+            check(initialBounds[8] > 0, "Emulator has an on-screen navigation bar for overlap regression tests");
+            check(safeViewport(initialBounds), "Actual WebView bounds exclude status bar, navigation bar and display cutouts");
             check("true".equals(js("document.getElementById('demo').click(); chunks.length > 0 && stream.startsWith('ZIP:')")), "Demo compression");
             check("true".equals(js("codec.decode(stream).width === 64 && codec.decode(stream).height === 48")), "Preview dimensions");
             check("true".equals(js("chunks.every(c => codec.ndefSize(c) <= 868)")), "Native default capacity");
@@ -72,6 +79,9 @@ public final class SmokeInstrumentation extends Instrumentation
             check("true".equals(js("window.onNativeEvent({type:'hardware',available:true,enabled:true}); document.getElementById('write').click(); !document.getElementById('confirm').hidden")), "Write requires explicit confirmation");
             check("true".equals(js("document.getElementById('dismissConfirm').click(); document.getElementById('confirm').hidden")), "Cancel confirmation");
             check("true".equals(js("window.onNativeEvent({type:'reading',message:'test'}); document.getElementById('editor').disabled && !document.getElementById('operation').hidden")), "Active NFC freezes editor");
+            JSONArray operationBounds = new JSONArray(js("(() => { const bar=document.getElementById('operation').getBoundingClientRect(); const button=document.getElementById('cancel').getBoundingClientRect(); return [bar.bottom,button.bottom,devicePixelRatio]; })()"));
+            int[] statusBounds = viewportBounds(activity);
+            check(statusBounds[1] + operationBounds.getDouble(0) * operationBounds.getDouble(2) <= statusBounds[7] + 1 && statusBounds[1] + operationBounds.getDouble(1) * operationBounds.getDouble(2) <= statusBounds[7] + 1, "Fixed NFC status bar and cancel button remain above Android navigation buttons");
             check("true".equals(js("window.onNativeEvent({type:'cancelled',message:'test'}); !document.getElementById('editor').disabled && document.getElementById('operation').hidden")), "Cancel unlocks editor");
             check("true".equals(js("window.savedCode = stream; window.savedPreview = document.getElementById('preview').toDataURL(); loadCode(chunks.slice().reverse().join('\\n'), 'saved.txt'); source === null && importedImage !== null && stream === window.savedCode")), "Saved chunks import without re-encoding");
             check("true".equals(js("document.getElementById('imageSettings').disabled && !document.getElementById('openImport').disabled && document.getElementById('preview').toDataURL() === window.savedPreview")), "Imported preview and source controls");
@@ -80,6 +90,15 @@ public final class SmokeInstrumentation extends Instrumentation
             check("true".equals(js("document.getElementById('dismissConfirm').click(); try { loadCode('P1/2#ZIP:broken'); } catch(error) {} stream === window.savedCode")), "Bad import leaves previous image intact");
             check("true".equals(js("document.getElementById('openImport').click(); !document.getElementById('codeImport').hidden && document.getElementById('codeText').tagName === 'TEXTAREA' && document.getElementById('codeInput') === null")), "Import opens a paste dialog without a text file picker");
             check("true".equals(js("window.dialogBounds=document.getElementById('codeImport').getBoundingClientRect(); window.dialogBounds.top === 0 && window.dialogBounds.left === 0 && Math.abs(window.dialogBounds.bottom-innerHeight) < 1 && Math.abs(window.dialogBounds.right-innerWidth) < 1")), "Import dialog stays inside the viewport on older WebViews");
+            check("true".equals(js("window.dialogCard=document.getElementById('codeImport').firstElementChild.getBoundingClientRect(); window.dialogCard.top >= 0 && window.dialogCard.top <= 24")), "Import dialog is top aligned before keyboard opens");
+            js("window.viewportBeforeKeyboard=innerHeight; document.getElementById('codeText').focus(); true");
+            runOnMainSync(() -> { webView.requestFocus(); ((InputMethodManager)getTargetContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE)).showSoftInput(webView, InputMethodManager.SHOW_FORCED); });
+            waitForKeyboard(activity, true);
+            check(safeViewport(viewportBounds(activity)), "Actual WebView viewport excludes the visible software keyboard");
+            check("true".equals(js("window.dialogCard=document.getElementById('codeImport').firstElementChild.getBoundingClientRect(); innerHeight < window.viewportBeforeKeyboard && window.dialogCard.top >= 0 && window.dialogCard.top <= 24 && window.dialogCard.bottom <= innerHeight + 1")), "Import dialog stays at the top and fits above the keyboard");
+            runOnMainSync(() -> ((InputMethodManager)getTargetContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(webView.getWindowToken(), 0));
+            waitForKeyboard(activity, false);
+            check(safeViewport(viewportBounds(activity)) && "true".equals(js("innerHeight === window.viewportBeforeKeyboard")), "Viewport restores correctly after keyboard closes");
             check("true".equals(js("document.getElementById('codeText').value='P1/2#ZIP:broken'; document.getElementById('applyImport').click(); !document.getElementById('codeImport').hidden && !document.getElementById('importError').hidden && stream === window.savedCode")), "Invalid paste preserves the image and reports error in dialog");
             js("document.getElementById('codeText').value=''; document.getElementById('codeText').focus(); true");
             runOnMainSync(() -> ((ClipboardManager)getTargetContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("MicroIMG test", "P1/1#DP:W2H2:0AF1")));
@@ -128,6 +147,64 @@ public final class SmokeInstrumentation extends Instrumentation
     {
         if(!condition) throw new AssertionError(message);
         passed++;
+    }
+    private WebView findWebView(View view)
+    {
+        if(view instanceof WebView) return (WebView)view;
+        if(view instanceof ViewGroup)
+            for(int i = 0; i < ((ViewGroup)view).getChildCount(); i++)
+            {
+                WebView found = findWebView(((ViewGroup)view).getChildAt(i));
+                if(found != null) return found;
+            }
+        return null;
+    }
+    private int[] viewportBounds(Activity activity)
+    {
+        int[] bounds = new int[10];
+        runOnMainSync(() -> {
+            View decor = activity.getWindow().getDecorView();
+            int[] origin = new int[2], location = new int[2];
+            decor.getLocationOnScreen(origin);
+            webView.getLocationOnScreen(location);
+            WindowInsets insets = decor.getRootWindowInsets();
+            int left, top, right, bottom;
+            if(android.os.Build.VERSION.SDK_INT >= 30)
+            {
+                android.graphics.Insets safe = insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout() | WindowInsets.Type.ime());
+                left = safe.left; top = safe.top; right = safe.right; bottom = safe.bottom;
+                bounds[8] = insets.getInsets(WindowInsets.Type.navigationBars()).bottom;
+                bounds[9] = insets.getInsets(WindowInsets.Type.ime()).bottom;
+            }
+            else
+            {
+                left = insets.getSystemWindowInsetLeft(); top = insets.getSystemWindowInsetTop(); right = insets.getSystemWindowInsetRight(); bottom = insets.getSystemWindowInsetBottom();
+                bounds[8] = insets.getStableInsetBottom();
+                bounds[9] = bottom;
+            }
+            bounds[0] = location[0]; bounds[1] = location[1];
+            bounds[2] = location[0] + webView.getWidth(); bounds[3] = location[1] + webView.getHeight();
+            bounds[4] = origin[0] + left; bounds[5] = origin[1] + top;
+            bounds[6] = origin[0] + decor.getWidth() - right; bounds[7] = origin[1] + decor.getHeight() - bottom;
+        });
+        return bounds;
+    }
+    private boolean safeViewport(int[] bounds)
+    {
+        for(int i = 0; i < 4; i++)
+            if(Math.abs(bounds[i] - bounds[i + 4]) > 1) return false;
+        return true;
+    }
+    private void waitForKeyboard(Activity activity, boolean visible) throws Exception
+    {
+        long deadline = System.currentTimeMillis() + 10000;
+        while(System.currentTimeMillis() < deadline)
+        {
+            int[] bounds = viewportBounds(activity);
+            if((bounds[9] > bounds[8]) == visible && safeViewport(bounds)) return;
+            Thread.sleep(100);
+        }
+        throw new AssertionError("Keyboard " + (visible ? "opening" : "closing") + " did not produce a safe viewport");
     }
     private String js(String script) throws Exception
     {

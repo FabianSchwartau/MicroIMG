@@ -7,6 +7,7 @@ The app works offline. Image processing runs in bundled JavaScript inside an iso
 ## Features
 
 - Compact navy and emerald interface based on the original desktop design, with Core Settings, Batch & NFC, Recovery, format buttons and a persistent dark/light theme.
+- A native container keeps the WebView viewport clear of Android system bars, display cutouts and the software keyboard. The text import dialog is top aligned and scrolls when space is limited.
 - Paste MicroIMG text directly in **Bild → Text**, preview and write it without re-encoding; target capacity changes only redistribute the existing data across tags.
 - Image selection, rotation, pan and pinch zoom, aspect-preserving resolution from 16 to 1024 pixels on the longest side.
 - Grayscale slider with every value from 2 to 16 levels, contrast, Atkinson and Floyd-Steinberg dithering.
@@ -45,7 +46,7 @@ cd android
 ./build-apk.sh
 ```
 
-The APK and its SHA-256 checksum are written to the ignored `dist/` directory at the repository root (currently `dist/MicroIMG-1.2.0.apk`). APKs can be distributed separately as release assets.
+The APK and its SHA-256 checksum are written to the ignored `dist/` directory at the repository root (currently `dist/MicroIMG-1.2.1.apk`). APKs can be distributed separately as release assets.
 
 The script creates a local release keystore on the first build. Preserve `android/signing/microimg-release.jks` for future updates of this installation; it is intentionally ignored by Git. Its local default password is `microimg-local`, alias `microimg`. To use your own signing identity, set `MICROIMG_KEYSTORE`, `MICROIMG_STORE_PASSWORD` and `MICROIMG_KEY_PASSWORD`. The keystore is not embedded in the APK.
 
@@ -58,6 +59,8 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 adb shell am instrument -w io.github.ledflighter.microimg.test/io.github.ledflighter.microimg.SmokeInstrumentation
 ```
+
+Use an emulator with on-screen navigation (`hw.mainKeys = no`) and a software keyboard for the system-bar and keyboard regression checks. These checks measure the actual native WebView bounds and open and close the real Android keyboard.
 
 The codec tests compare the binary output directly with the original desktop packer at every grayscale depth; check independently created zlib fixtures; and exercise capacity boundaries, multi-digit chunk headers, missing or conflicting chunks, malformed payloads and bounded decompression. The Android instrumentation tests exercise actual `NdefMessage` serialization and parsing, UTF-16 and MIME text, and the complete compression/reconstruction interface inside Android's WebView.
 
