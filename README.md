@@ -1,5 +1,9 @@
 🇩🇪 Deutsche Version
 
+## Android-App
+
+Die eigenständige Android-Portierung mit direktem NFC-Zugriff liegt unter [`android/`](android/README.md). Die [Bauanleitung](android/README.md#build) beschreibt, wie die installierbare APK erzeugt wird. Sie funktioniert ab Android 8.0 ohne Python-Server oder externen NFC-Leser. Unterstützt werden NDEF-Tags, insbesondere NTAG21x, einschließlich Mehrtag-Serien und Schreibprüfung. Version 1.1 orientiert sich am ursprünglichen Design und kann gespeicherte MicroIMG-TXT-Dateien im Tab „Bild → Text“ zum erneuten Schreiben importieren.
+
 # 🔬 MicroIMG
 
 > Bildkomprimierung für minimale Speicherkapazitäten & Multi-Chunk NFC-Übertragung.
