@@ -172,6 +172,25 @@ public final class MainActivity extends Activity
             });
         }
         @JavascriptInterface public void hardware() { runOnUiThread(() -> nfc.status()); }
+        @JavascriptInterface public void pasteCode()
+        {
+            runOnUiThread(() -> {
+                JSONObject data = new JSONObject();
+                try
+                {
+                    data.put("type", "paste");
+                    ClipData clip = ((ClipboardManager)getSystemService(CLIPBOARD_SERVICE)).getPrimaryClip();
+                    CharSequence text = clip != null && clip.getItemCount() > 0 ? clip.getItemAt(0).getText() : null;
+                    if(text == null || text.length() == 0)
+                        data.put("error", "Die Zwischenablage enthält keinen Text.");
+                    else if(text.length() > 3000000)
+                        data.put("error", "Der Text ist zu groß (max. 3 MB).");
+                    else data.put("text", text.toString());
+                    event(data);
+                }
+                catch(Exception error) { status("error", "Die Zwischenablage konnte nicht gelesen werden. Bitte den Text direkt einfügen."); }
+            });
+        }
         @JavascriptInterface public void copy(String text)
         {
             if(text.length() > 3000000) return;

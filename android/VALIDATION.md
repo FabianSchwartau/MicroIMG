@@ -1,8 +1,24 @@
 # Android validation
 
+## Version 1.2.0
+
+Validated on 2026-10-27 using Android 11 / API 30 x86_64 in the emulator. Minimum API 26 and target API 36 remain unchanged.
+
+- Release, debug and instrumentation APK builds succeeded; `lintRelease` reported no errors.
+- All ten codec test groups passed.
+- All 58 Android NDEF/UI checks passed. New checks cover the text import dialog, actual Android clipboard retrieval, invalid paste preserving the previous image, cancellation, every slider value from 2 to 16 gray levels, free PNG export factors, validation of invalid/oversized factors, the actual dimensions in a PNG generated with factor 13, and visible dialog positioning on older WebViews.
+- Simulated tag callbacks verified consecutive single-tag pictures without stopping the reader or displaying reset, preserving the last picture after a damaged scan, transitioning from a single-tag picture to an unordered multi-tag series, and retaining explicit reset for completed multi-tag series.
+- Export testing verified that a pending PNG export keeps its selected image snapshot while the next single-tag scan updates the main decoded image.
+- The final signed release APK installed and launched successfully. `apksigner` verified the signature; `aapt` confirmed version 1.2.0, version code 3 and NFC-only permission. The signing certificate matches previous releases.
+- JavaScript syntax, build script syntax and Git whitespace checks passed.
+
+These reader tests exercise application state with simulated callbacks; they do not validate physical NFC RF communication. The hardware limitations below still apply.
+
+## Previous validation: version 1.1.0
+
 Version 1.1.0 was validated on 2026-10-27. The application targets API 36 and supports API 26 (Android 8.0) and later. Runtime testing used an Android 11 / API 30 x86_64 emulator.
 
-## Completed checks
+### Completed checks
 
 - Release, debug and instrumentation APKs built successfully with AGP 8.13.2 and Gradle 8.13.
 - Android `lintRelease`: no errors; two advisory warnings concerning the pinned Gradle version and optional Android 12 backup rules.
